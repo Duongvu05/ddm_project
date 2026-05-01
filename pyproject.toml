@@ -1,0 +1,36 @@
+[project]
+name = "ddm_project"
+version = "0.1.0"
+description = "A modern Python project managed by uv."
+readme = "README.md"
+requires-python = ">= 3.12"
+authors = [
+    { name = "Vu Ngoc Duong", email = "vungocduong255@gmail.com" }
+]
+dependencies = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+    "lightgbm>=4.6.0",
+    "loguru>=0.7.0",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.4",
+    "pandas>=3.0.2",
+    "pyarrow>=24.0.0",
+    "pydantic>=2.13.3",
+    "scikit-learn>=1.8.0",
+    "seaborn>=0.13.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ddm_project"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "ruff>=0.3.0",
+    "pyright>=1.1.350",
+]

@@ -1,0 +1,46 @@
+data:
+  data_dir: "data"
+
+preprocessing:
+  obsolete_ratio_threshold: 0.95
+  obsolete_cutoff_date: "2019-01-01"
+  recent_weeks_for_train: 8
+
+baselines:
+  k: 12
+  recent_weeks: 2
+  age_bins: [15, 25, 35, 45, 55, 65, 100]
+  age_labels: ["16-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+  sample_eval: 50000
+
+cf:
+  k: 12
+  recent_weeks: 8
+  min_item_support: 5
+  top_similar: 50
+  fallback_n: 100
+  sample_eval: 50000
+
+model:
+  k: 12
+  n_candidates: 100
+  repurchase_short_days: 14
+  repurchase_long_days: 60
+  popular_global_n: 50
+  popular_segment_n: 30
+  popular_window_days: 14
+  sample_eval: 50000
+  lgbm_params:
+    objective: "lambdarank"
+    metric: "ndcg"
+    ndcg_eval_at: [12]
+    learning_rate: 0.05
+    num_leaves: 63
+    min_child_samples: 20
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    n_estimators: 300
+    n_jobs: -1
+    verbose: -1
+    random_state: 42
