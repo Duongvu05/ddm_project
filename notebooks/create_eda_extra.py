@@ -6,7 +6,7 @@ import nbformat as nbf
 
 NB_PATH = Path(__file__).parent / "eda.ipynb"
 
-with open(NB_PATH) as f:
+with open(NB_PATH, encoding="utf-8") as f:
     nb = nbf.read(f, as_version=4)
 
 extra_cells = []
@@ -21,13 +21,29 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.ticker as ticker
 from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.mixture import GaussianMixture
+                                        
+ROOT = Path.cwd().resolve().parent
+FIG_DIR = ROOT / "figures"
+FIG_DIR.mkdir(exist_ok=True)                                                                    
 
-sns.set_theme(style="whitegrid", palette="muted", font_scale=1.1)
+sns.set_theme(style="white", palette="muted", font_scale=1.1)
+
+plt.rcParams.update({
+    "figure.dpi": 110,
+    "axes.grid": False,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+})
+                                  
+plt.rcParams["figure.dpi"] = 110
+
 DATA = Path("../data")
+
 
 articles     = pd.read_parquet(DATA / "articles.parquet")
 transactions = pd.read_parquet(DATA / "transactions.parquet")
@@ -63,10 +79,10 @@ for i, grp in enumerate(target_groups):
     ax.fill_between(gd["month_start"], gd["ci_lower"], gd["ci_upper"],
                     color=colors[i], alpha=0.2)
     ax.set_title(f"Mean price – {grp}")
-    ax.tick_params(axis="x", rotation=45, labelsize=8)
+    ax.tick_params(axis="x", rotation=0, labelsize=8)
 plt.suptitle("Mean Price per Month by Product Group (95% CI)", y=1.01, fontsize=14)
 plt.tight_layout()
-plt.savefig("seasonal_price.png", bbox_inches="tight")
+plt.savefig(FIG_DIR / "seasonal_price.png", bbox_inches="tight")
 plt.show()
 """))
 
@@ -77,43 +93,59 @@ df_cat = tx_temp.merge(
     articles[["article_id", "index_group_name", "index_name", "product_type_name"]],
     on="article_id"
 )
+
 df_cat["Category"] = (
     df_cat["index_group_name"] + " | " +
     df_cat["index_name"] + " | " +
     df_cat["product_type_name"]
 )
+
 cat_totals = df_cat.groupby("Category").size()
 monthly_cat = df_cat.groupby(["Category", "month_year"]).size().reset_index(name="cnt")
+
 monthly_cat["pct"] = monthly_cat.apply(
     lambda r: 100 * r["cnt"] / cat_totals[r["Category"]], axis=1
 )
 monthly_cat["my_str"] = monthly_cat["month_year"].astype(str)
-
 pca_data = monthly_cat.pivot(index="Category", columns="my_str", values="pct").fillna(0)
+
 scaled = StandardScaler().fit_transform(pca_data)
 pcs = PCA(n_components=2, random_state=42).fit_transform(scaled)
 
 gmm = GaussianMixture(n_components=4, random_state=42)
 labels = gmm.fit_predict(pcs)
-
 pca_df = pd.DataFrame({"PC1": pcs[:, 0], "PC2": pcs[:, 1], "Season": labels})
 season_map = {0: "No season", 1: "Spring/Summer", 2: "Autumn/Winter", 3: "Mixed"}
 
-fig, ax = plt.subplots(figsize=(8, 6))
+fig, ax = plt.subplots(figsize=(10, 6)) 
+
 for s, name in season_map.items():
     sub = pca_df[pca_df["Season"] == s]
-    ax.scatter(sub["PC1"], sub["PC2"], label=name, s=12, alpha=0.7)
+    ax.scatter(sub["PC1"], sub["PC2"], label=name, s=25, alpha=0.7, edgecolors='w')
+
 ax.set_xlabel("PC1")
 ax.set_ylabel("PC2")
-ax.set_title("PCA of Category Sales Trends – GMM Clusters (Seasonality)")
-ax.legend()
+ax.set_title("PCA of Category Sales Trends – GMM Clusters (Seasonality)", pad=15)
+
+ax.legend(
+    title="Seasonality Type", 
+    loc='upper left', 
+    bbox_to_anchor=(1.02, 1), 
+    borderaxespad=0,
+    frameon=True
+)
+
 sns.despine()
+
 plt.tight_layout()
-plt.savefig("pca_seasonality.png", bbox_inches="tight")
+plt.savefig(FIG_DIR / "pca_seasonality.png", bbox_inches="tight", dpi=300)
 plt.show()
 
 season_counts = pca_df["Season"].value_counts().rename(index=season_map)
+print("-" * 30)
+print("Thống kê số lượng Category theo mùa:")
 print(season_counts)
+print("-" * 30)
 """))
 
 # ── Section 11: Out-of-stock ───────────────────────────────────────────────────
@@ -133,22 +165,31 @@ obsolete = article_sales[article_sales["before_2019_ratio"] >= 0.95]
 print(f"Tổng articles trong transactions : {len(article_sales):,}")
 print(f"Obsolete (≥95% doanh số trước 2019): {len(obsolete):,}  ({len(obsolete)/len(article_sales):.1%})")
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+# 1. gridspec_kw={'width_ratios': [1, 1.5]} 
+fig, axes = plt.subplots(1, 2, figsize=(14, 5), gridspec_kw={'width_ratios': [1, 1.2]})
+
+# --- SUBPLOT 1: HISTOGRAM ---
 axes[0].hist(article_sales["before_2019_ratio"], bins=50, color="steelblue",
              edgecolor="white", linewidth=0.3)
 axes[0].axvline(0.95, color="red", linestyle="--", label="Threshold 0.95")
-axes[0].set_xlabel("Fraction of sales before 2019")
-axes[0].set_ylabel("# Articles")
-axes[0].set_title("Distribution of Old-Sales Ratio")
-axes[0].legend()
+axes[0].get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
+axes[0].set_xlabel("Fraction of sales before 2019")
+axes[0].set_ylabel("Number of Articles")
+axes[0].set_title("Distribution of Old-Sales Ratio")
+
+# legend
+axes[0].legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=1)
+
+# --- SUBPLOT 2: PIE CHART ---
 sizes = [len(obsolete), len(article_sales) - len(obsolete)]
 axes[1].pie(sizes, labels=["Discontinued", "Active"],
-            autopct="%1.1f%%", colors=["salmon", "steelblue"], startangle=90)
+            autopct="%1.1f%%", colors=["salmon", "steelblue"], 
+            startangle=90, pctdistance=0.85, explode=(0.05, 0))
 axes[1].set_title("Active vs Discontinued Articles")
 
 plt.tight_layout()
-plt.savefig("out_of_stock.png", bbox_inches="tight")
+plt.savefig(FIG_DIR / "out_of_stock.png", bbox_inches="tight")
 plt.show()
 """))
 
@@ -193,7 +234,7 @@ ax.set_title("Repurchase Rate by Granularity & Time Window")
 ax.legend(title="Granularity")
 sns.despine()
 plt.tight_layout()
-plt.savefig("repurchase_granularity.png", bbox_inches="tight")
+plt.savefig(FIG_DIR / "repurchase_granularity.png", bbox_inches="tight")
 plt.show()
 
 print(plot_df.round(2))
@@ -228,7 +269,7 @@ try:
     ax.axis("off")
     ax.set_title("Word Cloud – Article Detail Descriptions", fontsize=14)
     plt.tight_layout()
-    plt.savefig("wordcloud.png", bbox_inches="tight")
+    plt.savefig(FIG_DIR / "wordcloud.png", bbox_inches="tight")
     plt.show()
 except ImportError:
     print("wordcloud not installed — run: uv add wordcloud")
@@ -236,7 +277,7 @@ except ImportError:
 
 nb.cells.extend(extra_cells)
 
-with open(NB_PATH, "w") as f:
+with open(NB_PATH, "w", encoding="utf-8") as f:
     nbf.write(nb, f)
 
 print(f"Added {len(extra_cells)} cells to {NB_PATH}")
