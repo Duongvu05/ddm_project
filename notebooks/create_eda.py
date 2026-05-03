@@ -173,7 +173,7 @@ axes[-1].xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 plt.xticks(rotation=0, ha='center') # Để nằm ngang cho dễ đọc
 axes[-1].set_xlabel("", fontsize=12, labelpad=10)
 
-plt.suptitle("WEEKLY ACTIVITY ANALYSIS\n(Sep 2018 – Sep 2020)", 
+plt.suptitle("WEEKLY ACTIVITY ANALYSIS (Sep 2018 – Sep 2020)", 
              fontsize=18, fontweight='bold', y=0.98)
 
 #plt.tight_layout() # Đã dùng hspace trong gridspec_kw nên có thể cân nhắc bỏ tight_layout
