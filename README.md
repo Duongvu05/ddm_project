@@ -158,7 +158,7 @@ The main model needs a **validation week** to build training features (features 
 
 ```
 ◄──── train_feat (~30M rows) ────►│◄── val (1w) ──►│◄── test (1w) ──►
-                                  │                 │
+                                  │                │
                             2020-09-02        2020-09-09        2020-09-22
 ```
 
