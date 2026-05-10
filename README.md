@@ -18,7 +18,7 @@ A production-ready two-stage recommendation system that predicts the 12 fashion 
 
 ## Results
 
-| Model | Type | MAP@12 | vs. Repurchase |
+| Model | Type | MAP@12 | ∆ vs. Repurchase |
 |---|---|---|---|
 | Global Popularity | Baseline | 0.0029 | −88.0% |
 | Age-Segmented Popularity | Baseline | 0.0035 | −85.5% |
@@ -30,6 +30,7 @@ A production-ready two-stage recommendation system that predicts the 12 fashion 
 | RRF Ensemble (LGBM + Repurchase + CF) | Ensemble | 0.0298 | +23.7% |
 
 > **Note on ensemble**: The RRF ensemble scores below the standalone LGBM v2 because repurchase and CF signals are already encoded as features inside the ranker — combining them at the output level introduces noise rather than complementary information. The LGBM v2 is the recommended production model.
+
 
 ---
 
@@ -436,18 +437,6 @@ pm2 delete hm-train
 | 12 | Repurchase rate at three granularities (article / product code / category) |
 | 13 | Word cloud of article names and descriptions |
 | Summary | Summary the key insight and Suggestions for Modeling |
-
----
-## Summary Model Results
-
-| Model | Family | MAP@12 | ∆ vs. Repurchase | Notes |
-|:---|:---|---:|---:|:---|
-| Global Popularity | Baseline | 0.0029 | -88.0% | Simplest approach, lowest effectiveness |
-| Age-segmented Popularity | Baseline | 0.0035 | -85.5% | Marginal improvement via demographic segmentation |
-| Recent Popularity (2w) | Baseline | 0.0068 | -71.8% | Significantly better than global by capturing short-term trends |
-| Item-based CF | CF | 0.0086 | -64.3% | Leverages co-purchase signals (co-occurrence) |
-| Repurchase | Baseline | 0.0241 | – | Strongest single-signal baseline — reflects habitual repurchase behavior |
-| **Two-stage LightGBM** | **Main** | **0.0334** | **+38.6%** | **Combines diverse candidate sources & learning-to-rank** |
 
 ---
 
