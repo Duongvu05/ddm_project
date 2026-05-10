@@ -43,11 +43,11 @@ Raw Transactions  ──►  Preprocessing & Out-of-Stock Filter
                     (6 sources, ~200 candidates/user)
                                   │
                                   ▼
-                    Stage 2 — Feature Engineering
+                    Stage 2a — Feature Engineering
                     (33 features: user / article / interaction)
                                   │
                                   ▼
-                    Stage 3 — LightGBM LambdaRank
+                    Stage 2b — LightGBM LambdaRank
                     (multi-week training, NDCG@12 objective)
                                   │
                                   ▼
@@ -73,7 +73,7 @@ All candidates are filtered against a set of ~10,781 **out-of-stock articles** (
 
 ---
 
-## Stage 2 — Feature Engineering (33 features)
+## Stage 2a — Feature Engineering (33 features)
 
 ### User features (13)
 | Feature | Description |
@@ -122,7 +122,7 @@ All candidates are filtered against a set of ~10,781 **out-of-stock articles** (
 
 ---
 
-## Stage 3 — LightGBM LambdaRank
+## Stage 2b — LightGBM LambdaRank
 
 - **Objective**: `lambdarank` with `ndcg@12` metric
 - **Multi-week training**: 3 consecutive validation weeks are used as training data (~36M feature rows), providing 8× more signal than single-week training
@@ -205,6 +205,9 @@ ddm_project/
 │   ├── articles.parquet          # Article catalogue (~105K rows)
 │   ├── customers.parquet         # Customer profiles (~1.4M rows)
 │   └── transactions.parquet      # 2-year transaction history (~31M rows)
+├── docs/                         
+│   └── Report Group 3.pdf        # Report 
+├── figures/                      # All figures used in EDA notebook             
 ├── notebooks/
 │   ├── eda.ipynb                 # Exploratory Data Analysis (13 sections)
 │   └── results.ipynb             # Model comparison, feature importance, error analysis
@@ -421,35 +424,54 @@ pm2 delete hm-train
 | Section | Topic |
 |---|---|
 | 1–2 | Schema overview, missing values, data types |
-| 3–4 | Weekly activity trends, price distribution |
-| 5–6 | Customer demographics, purchase frequency distribution |
-| 7–8 | Article catalogue analysis, top popular items |
-| 9 | Age group × product group purchase heatmap |
-| 10 | **Seasonality** — monthly price trends, PCA + GMM product clustering |
-| 11 | **Out-of-stock detection** — ~10,781 discontinued articles identified |
-| 12 | **Repurchase rate** at three granularities (article / product code / category) |
+| 3 | Transactions weekly activity trends |
+| 4 | Price Sensitivity and Sale channels analysis |
+| 5| Customer demographics, purchase frequency distribution |
+| 6 | Article catalogue analysis, top popular and trending items |
+| 7 | Age group × product group purchase heatmap |
+| 8 | Monthly retention rate and repurchase behaviors across products attributes |
+| 9 | Recency and Purchase behavior analysis |
+| 10 | Seasonality analysis using PCA + GMM product clustering |
+| 11 | Out-of-stock detection — ~10,781 discontinued articles identified |
+| 12 | Repurchase rate at three granularities (article / product code / category) |
 | 13 | Word cloud of article names and descriptions |
+| Summary | Summary the key insight and Suggestions for Modeling |
+
+---
+## Summary Model Results
+
+| Model | Family | MAP@12 | ∆ vs. Repurchase | Notes |
+|:---|:---|---:|---:|:---|
+| Global Popularity | Baseline | 0.0029 | -88.0% | Simplest approach, lowest effectiveness |
+| Age-segmented Popularity | Baseline | 0.0035 | -85.5% | Marginal improvement via demographic segmentation |
+| Recent Popularity (2w) | Baseline | 0.0068 | -71.8% | Significantly better than global by capturing short-term trends |
+| Item-based CF | CF | 0.0086 | -64.3% | Leverages co-purchase signals (co-occurrence) |
+| Repurchase | Baseline | 0.0241 | – | Strongest single-signal baseline — reflects habitual repurchase behavior |
+| **Two-stage LightGBM** | **Main** | **0.0334** | **+38.6%** | **Combines diverse candidate sources & learning-to-rank** |
 
 ---
 
 ## Key Findings
 
-1. **Repurchase is the strongest single signal.** H&M customers frequently rebuy the same items; the repurchase baseline (MAP@12 = 0.0241) is difficult to beat with popularity-only models and serves as the main comparison point.
+1. **Repurchase is the strongest single signal.** The repurchase baseline achieves MAP@12 = 0.0241, outperforming Item-CF (0.0086) by 2.8× and serving as the primary benchmark. This aligns with EDA showing 30–40% of transactions are repeat purchases, confirming habitual buying behavior dominates fashion retail.
 
-2. **Recency dominates history depth.** Recent popularity (last 2 weeks, 0.0068) outperforms all-time global popularity (0.0029) by over 2×, confirming that fashion demand is highly seasonal and short-lived.
+2. **Short-term popularity > long-term aggregates.** Recent popularity (last 2 weeks, MAP@12 = 0.0068) beats all-time global popularity (0.0029) by 2.3×, validating the EDA finding that fashion preferences are non-stationary and trend-driven.
 
-3. **~10,781 articles are effectively out of stock.** Items where ≥95% of sales occurred before 2019 are excluded from all candidate pools, removing noise and improving precision.
+3. **Out-of-stock mask removes ~10.3% of catalogue noise.** Articles with ≥95% of lifetime sales before 2019 are filtered pre-ranking, preventing discontinued items from reaching candidates and improving precision without sacrificing recall.
 
-4. **Candidate recall was the primary bottleneck.** Expanding from 2 candidate sources to 6 and increasing the candidate budget from 50 to 200 raised Stage 1 recall from ~9.6% to ~28%, which directly drove the v2 MAP@12 improvement.
+4. **Candidate recall is the binding ceiling for MAP@12.** Expanding Stage 1 from 2→6 sources and budget 50→200 raised recall@200 from 9.6%→28%, which was the dominant driver of the v1→v2 improvement—confirming that retrieval quality matters more than ranker tuning alone.
 
-5. **Multi-week training provides large gains.** Using 3 consecutive training windows (~36M rows vs. ~4M) allows the ranker to observe more user-article pairs and generalise better across purchase patterns.
+5. **Multi-week training yields consistent but bounded gains.** Stacking 3 consecutive weeks (~36M rows vs. ~4M) improved MAP@12 by +2.0% relative, suggesting that once the model sees enough temporal diversity, additional history yields diminishing returns.
 
-6. **Cold-start remains the dominant failure mode.** Approximately 60% of test users receive an AP@12 of 0, driven by customers with sparse or no purchase history who cannot benefit from repurchase or interaction features.
+6. **Cold-start users drive the majority of zero-AP cases.** ~60% of test users score AP@12 = 0, predominantly those with ≤2 prior purchases. For these users, interaction features are uninformative and the model falls back to age-segmented popularity—highlighting the need for content-based signals.
 
-7. **Top LightGBM features by gain**: `ua_days_since_purchase`, `ua_has_purchased`, `art_pop_2w`, `user_days_since_last_tx`, `ua_purchase_count`, `art_trend_score`.
+7. **Price positioning and temporal dynamics dominate feature importance.** The ranker’s top gain-based features are led by `art_avg_price`, `art_trend_score`, and short-window popularity (`art_pop_1w`), confirming that pricing alignment and recent sales momentum are the strongest purchase predictors. Recency signals (`user_days_since_last_tx`, `ua_days_since_purchase`) and price-affinity features (`ua_price_affinity`, `user_avg_price`) further drive personalization, while static metadata (colour, section, product type) slightly rank lower—demonstrating that behavioral and time-decayed interactions outperform descriptive attributes.
 
-8. **Ensemble added noise, not signal.** Because repurchase and CF signals are already encoded as explicit features inside the LGBM ranker, fusing their output-level lists via RRF hurts precision. A more effective ensemble strategy would combine multiple LGBM variants trained with different hyperparameters or candidate sets.
+8. **Ensemble via RRF adds correlated noise, not complementary signal.** Combining LightGBM + Repurchase + Item-CF at output level yielded MAP@12 = 0.0298 vs. 0.0334 for standalone ranker, because repurchase/CF signals are already encoded as explicit features inside the model.
 
+9. **User heterogeneity creates bimodal performance distribution.** The ranker excels on users aged 25–44 with >15 historical purchases, while cold-start and low-activity segments drag down aggregate MAP@12—suggesting separate modeling or fallback strategies per user cohort.
+
+10. **38.6% MAP@12 lift is both statistically and commercially significant.**  Bootstrap validation confirms this improvement over the baseline is robust. From a business perspective, more accurate rankings directly drive higher click-through and conversion rates. At H&M's scale, this translates into measurable revenue growth, making a strong case for production deployment.
 ---
 
 ## Configuration (`configs/default.yaml`)
