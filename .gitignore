@@ -43,3 +43,9 @@ htmlcov/
 # pyright / ruff cache
 .pyright/
 .ruff_cache/
+
+# Ignore specific notebooks scripts
+notebooks/create_eda_extra.py
+notebooks/create_eda.py
+notebooks/create_results.py
+notebooks/run_eda.py
